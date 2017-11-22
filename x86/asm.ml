@@ -1,3 +1,5 @@
+open FormatUtil
+
 (* 2オペランドではなく3オペランドのx86アセンブリもどき *)
 
 type id_or_imm = V of Id.t | C of int
@@ -86,3 +88,126 @@ let rec concat e1 xt e2 =
   | Let(yt, exp, e1') -> Let(yt, exp, concat e1' xt e2)
 
 let align i = (if i mod 8 = 0 then i else i + 4)
+
+(* ioi = id_or_imm *)
+let format_string_of_ioi = function
+  | V id -> unary "Var"id
+  | C i -> unary "Int" (string_of_int i)
+
+let rec format_string_of_asm = function
+  | Ans exp -> unary "Ans" (format_string_of_exp exp)
+  | Let ((id, _), exp, asm) ->
+    Printf.sprintf "@[<v 0>Let (@[<0>%s,@ %s,@]@ %s)@]"
+      (unary "Var" id)
+      (format_string_of_exp exp)
+      (format_string_of_asm asm)
+
+and format_string_of_exp  = function
+  | Nop -> "@[<1>Nop@]"
+  | Set i -> Printf.sprintf "@[<1>Int@ %d@]" i
+  | SetL (Id.L id) -> unary "SetL" (unary "Var" id)
+  | Mov id -> unary "Mov" (unary "Var" id)
+  | Neg id -> unary "Neg" (unary "Var" id)
+  | Add (id, ioi) -> binary "Add" (unary "Var" id) (format_string_of_ioi ioi)
+  | Sub (id, ioi) -> binary "Sub" (unary "Var" id) (format_string_of_ioi ioi)
+  | Ld (id, ioi, i) ->
+    ternary "Ld"
+      (unary "Var" id)
+      (format_string_of_ioi ioi)
+      (unary "Int" (string_of_int i))
+  | St (id1, id2, ioi, i) ->
+    quaternary "St"
+      (unary "Var" id1)
+      (unary "Var" id2)
+      (format_string_of_ioi ioi)
+      (unary "Int" (string_of_int i))
+  | FMovD id -> unary "FMovD" (unary "Var" id)
+  | FNegD id -> unary "FNegD" (unary "Var" id)
+  | FAddD (id1, id2) -> binary "FAddD" (unary "Var" id1) (unary "Var" id2)
+  | FSubD (id1, id2) -> binary "FSubD" (unary "Var" id1) (unary "Var" id2)
+  | FMulD (id1, id2) -> binary "FMulD" (unary "Var" id1) (unary "Var" id2)
+  | FDivD (id1, id2) -> binary "FDivD" (unary "Var" id1) (unary "Var" id2)
+  | LdDF (id, ioi, i) ->
+    ternary "LdDF" (unary "Var" id) (format_string_of_ioi ioi) (unary "Int" (string_of_int i))
+  | StDF (id1, id2, ioi, i) ->
+    quaternary "StDF"
+      (unary "Var" id1)
+      (unary "Var" id2)
+      (format_string_of_ioi ioi)
+      (unary "Int" (string_of_int i))
+  | Comment str -> unary "Coment" str
+  | IfEq (id, ioi, asm1, asm2) ->
+    quaternary "IfEq"
+      (unary "Var" id)
+      (format_string_of_ioi ioi)
+      (format_string_of_asm asm1)
+      (format_string_of_asm asm2)
+  | IfLE (id, ioi, asm1, asm2) ->
+    quaternary "IfLE"
+      (unary "Var" id)
+      (format_string_of_ioi ioi)
+      (format_string_of_asm asm1)
+      (format_string_of_asm asm2)
+  | IfGE (id, ioi, asm1, asm2) ->
+    quaternary "IfGE"
+      (unary "Var" id)
+      (format_string_of_ioi ioi)
+      (format_string_of_asm asm1)
+      (format_string_of_asm asm2)
+  | IfFEq (id1, id2, asm1, asm2) ->
+    quaternary "IfFEq"
+      (unary "Var" id1)
+      (unary "Var" id2)
+      (format_string_of_asm asm1)
+      (format_string_of_asm asm2)
+  | IfFLE (id1, id2, asm1, asm2) ->
+    quaternary "IfFLE"
+      (unary "Var" id1)
+      (unary "Var" id2)
+      (format_string_of_asm asm1)
+      (format_string_of_asm asm2)
+  | CallCls (id, idlist1, idlist2) ->
+    ternary "CallCls"
+      (unary "Var" id)
+      (format_string_of_list idlist1 (unary "Var"))
+      (format_string_of_list idlist2 (unary "Var"))
+  | CallDir (Id.L id, idlist1, idlist2) ->
+    ternary "CallCls"
+      (unary "Var" id)
+      (format_string_of_list idlist1 (unary "Var"))
+      (format_string_of_list idlist2 (unary "Var"))
+  | Save (id1, id2) -> binary "Save" (unary "Var" id1) (unary "Var" id2)
+  | Restore id -> unary "Restore" (unary "Var" id)
+
+and format_string_of_fundef
+    {name=Id.L name;
+     args=args;
+     fargs=fargs;
+     body=body;
+     ret=_} =
+  Printf.sprintf "@[<0>(@[<hv 0>%s,@ %s,@ %s,@ %s)@]@]"
+    (quoted name)
+    (format_string_of_list args quoted)
+    (format_string_of_list fargs quoted)
+    (format_string_of_asm body)
+
+let format_string (Prog (ftable, fundefs, asm)) =
+  ternary "Prog"
+    (format_string_of_list ftable
+       (fun (Id.L id, f) -> Printf.sprintf "(%s, %f)" id f))
+    (format_string_of_list fundefs format_string_of_fundef)
+    (format_string_of_asm asm)
+
+let print k =
+  k
+  |> format_string
+  |> Str.global_replace (Str.regexp_string "%") "%%"
+  |> (fun str -> Scanf.format_from_string str "")
+  |> Format.printf
+
+let string k =
+  k
+  |> format_string
+  |> Str.global_replace (Str.regexp_string "%") "%%"
+  |> (fun str -> Scanf.format_from_string str "")
+  |> Format.sprintf

@@ -1,3 +1,5 @@
+open FormatUtil
+
 (* give names to intermediate values (K-normalization) *)
 
 type t = (* K正規化後の式 (caml2html: knormal_t) *)
@@ -177,3 +179,62 @@ let rec g env = function (* K正規化ルーチン本体 (caml2html: knormal_g) 
                 (fun z -> Put(x, y, z), Type.Unit)))
 
 let f e = fst (g M.empty e)
+
+let rec format_string = function
+  | Unit -> "@[<1>()@]"
+  | Int i -> Printf.sprintf "@[<1>Int %d@]" i
+  | Float f -> Printf.sprintf "@[<1>Float %f@]" f
+  | Neg id -> unary "Neg" (unary "Var" id)
+  | Add (id1, id2) -> binary "Add" (unary "Var" id1) (unary "Var" id2)
+  | Sub (id1, id2) -> binary "Sub" (unary "Var" id1) (unary "Var" id2)
+  | FNeg id -> unary "FNeg" (unary "Var" id)
+  | FAdd (id1, id2) -> binary "FAdd" (unary "Var" id1) (unary "Var" id2)
+  | FSub (id1, id2) -> binary "FSub" (unary "Var" id1) (unary "Var" id2)
+  | FMul (id1, id2) -> binary "FMul" (unary "Var" id1) (unary "Var" id2)
+  | FDiv (id1, id2) -> binary "FDiv" (unary "Var" id1) (unary "Var" id2)
+  | IfEq (id1, id2, k1, k2) ->
+    quaternary "IfEq"
+      (unary "Var" id1) (unary "Var" id2)
+      (format_string k1) (format_string k2)
+  | IfLE (id1, id2, k1, k2) ->
+    quaternary "IfLE"
+      (unary "Var" id1) (unary "Var" id2)
+      (format_string k1) (format_string k2)
+  | Let ((id, _), k1, k2) ->
+    Printf.sprintf "@[<v 0>Let (@[<0>%s,@ %s,@]@ %s)@]"
+      (quoted id)
+      (format_string k1)
+      (format_string k2)
+  | Var id -> unary "Var" id;
+  | LetRec (def, k) ->
+    Printf.sprintf "@[<v 0>LetRec (@[<0>%s,@ %s,@ %s,@]@ %s)@]"
+      (quoted (fst def.name))
+      (format_string_of_list (List.map fst def.args) quoted)
+      (format_string def.body)
+      (format_string k)
+  | App (id, idlist) ->
+    binary "App" (unary "Var" id) (format_string_of_list idlist (unary "Var"))
+  | Tuple idlist -> unary "Tuple" (format_string_of_list idlist (unary "Var"))
+  | LetTuple (alist, id, k) ->
+    Printf.sprintf "@[<v 0>LetTuple (@[<0>%s,@ %s,@]@ %s)@]"
+      (format_string_of_list (List.map fst alist) quoted)
+      (unary "Var" id)
+      (format_string k)
+  | Get (id1, id2) -> binary "Get" (unary "Var" id1) (unary "Var" id2)
+  | Put (id1, id2, id3) ->
+    ternary "Put" (unary "Var" id1) (unary "Var" id2) (unary "Var" id3)
+  | ExtArray id -> unary "ExtArray" (unary "Var" id)
+  | ExtFunApp (id, idlist) ->
+    binary "ExtFunApp" (unary "Var" id) (format_string_of_list idlist (unary "Var"))
+
+let print k =
+  k
+  |> format_string
+  |> (fun str -> Scanf.format_from_string str "")
+  |> Format.printf
+
+let string k =
+  k
+  |> format_string
+  |> (fun str -> Scanf.format_from_string str "")
+  |> Format.sprintf

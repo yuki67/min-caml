@@ -1,3 +1,5 @@
+open FormatUtil
+
 type closure = { entry : Id.l; actual_fv : Id.t list }
 type t = (* クロージャ変換後の式 (caml2html: closure_t) *)
   | Unit
@@ -104,3 +106,78 @@ let f e =
   toplevel := [];
   let e' = g M.empty S.empty e in
   Prog(List.rev !toplevel, e')
+
+
+open FormatUtil
+
+let rec format_string (Prog (defs, knorm)) =
+  binary "Prog"
+    (format_string_of_list defs format_string_of_def)
+    (format_string_of_knorm knorm)
+
+and format_string_of_def {name=(Id.L name, _); args=args; formal_fv=fvs; body=body} =
+  Printf.sprintf "(@[<hv 0>%s,@ %s,@ %s,@ %s)@]"
+    (quoted name)
+    (format_string_of_list (List.map fst args) quoted)
+    (format_string_of_list (List.map fst fvs) quoted)
+    (format_string_of_knorm body)
+
+and format_string_of_knorm = function
+  | Unit -> "@[<1>()@]"
+  | Int i -> Printf.sprintf "@[<1>Int %d@]" i
+  | Float f -> Printf.sprintf "@[<1>Float %f@]" f
+  | Neg id -> unary "Neg" (unary "Var" id)
+  | Add (id1, id2) -> binary "Add" (unary "Var" id1) (unary "Var" id2)
+  | Sub (id1, id2) -> binary "Sub" (unary "Var" id1) (unary "Var" id2)
+  | FNeg id -> unary "FNeg" (unary "Var" id)
+  | FAdd (id1, id2) -> binary "FAdd" (unary "Var" id1) (unary "Var" id2)
+  | FSub (id1, id2) -> binary "FSub" (unary "Var" id1) (unary "Var" id2)
+  | FMul (id1, id2) -> binary "FMul" (unary "Var" id1) (unary "Var" id2)
+  | FDiv (id1, id2) -> binary "FDiv" (unary "Var" id1) (unary "Var" id2)
+  | IfEq (id1, id2, k1, k2) ->
+    quaternary "IfEq"
+      (unary "Var" id1) (unary "Var" id2)
+      (format_string_of_knorm k1) (format_string_of_knorm k2)
+  | IfLE (id1, id2, k1, k2) ->
+    quaternary "IfLE"
+      (unary "Var" id1) (unary "Var" id2)
+      (format_string_of_knorm k1) (format_string_of_knorm k2)
+  | Let ((id, t), k1, k2) ->
+    Printf.sprintf "@[<v 0>Let (@[<0>(%s, %s),@ %s,@]@ %s)@]"
+      (quoted id)
+      (Type.format_string t)
+      (format_string_of_knorm k1)
+      (format_string_of_knorm k2)
+  | Var id -> unary "Var" id;
+  | AppCls (id, idlist) ->
+    binary "AppCls" (unary "Var" id) (format_string_of_list idlist (unary "Var"))
+  | Tuple idlist -> unary "Tuple" (format_string_of_list idlist (unary "Var"))
+  | LetTuple (alist, id, k) ->
+    Printf.sprintf "@[<v 0>LetTuple (@[<0>%s,@ %s,@]@ %s)@]"
+      (format_string_of_list (List.map fst alist) quoted)
+      (unary "Var" id)
+      (format_string_of_knorm k)
+  | Get (id1, id2) -> binary "Get" (unary "Var" id1) (unary "Var" id2)
+  | Put (id1, id2, id3) ->
+    ternary "Put" (unary "Var" id1) (unary "Var" id2) (unary "Vare" id3)
+  | ExtArray (Id.L id) -> unary "ExtArray" (unary "Var" id)
+  | AppDir (Id.L id, idlist) ->
+    binary "AppDir" (unary "Var" id) (format_string_of_list idlist (unary "Var"))
+  | MakeCls ((id, _), {entry=Id.L entry; actual_fv=afvs}, knorm) ->
+    Printf.sprintf "@[<v 0>MakeCls (@[<0>%s,@ (%s,@ %s)@]@ %s)@]"
+      (quoted id)
+      (quoted entry)
+      (format_string_of_list afvs quoted)
+      (format_string_of_knorm knorm)
+
+let print k =
+  k
+  |> format_string
+  |> (fun str -> Scanf.format_from_string str "")
+  |> Format.printf
+
+let string k =
+  k
+  |> format_string
+  |> (fun str -> Scanf.format_from_string str "")
+  |> Format.sprintf
