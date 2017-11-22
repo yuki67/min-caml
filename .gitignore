@@ -1,0 +1,13 @@
+# to_x86で作られるシンボリックリンク
+asm.ml
+asm.mli
+emit.ml
+libmincaml.S
+regAlloc.ml
+simm.ml
+virtual.ml
+bytemark/Makefile
+min-rt/globals.s
+shootout/Makefile
+test/manyargs.ml
+test/toomanyargs.ml
