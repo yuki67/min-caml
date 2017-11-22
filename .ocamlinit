@@ -1,0 +1,3 @@
+open MinCaml;;
+(* エラーが出たときのバックトレースの有効化 *)
+Printexc.record_backtrace true;;
