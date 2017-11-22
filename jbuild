@@ -1,0 +1,22 @@
+(jbuild_version 1)
+
+(ocamllex (lexer))
+(ocamlyacc (parser))
+
+(rule ; gccによるコンパイルが必要なもの
+  ((targets (float.o))
+   (deps    (float.c))
+   (action  (run gcc -c ${<}))))
+
+(executable ; 実行形式
+ ((name           main)
+  (flags          (-ccopt -O3 -cclib -O3)) ; できるだけ高速化する
+  (ocamlopt_flags (-inline 100 float.o))
+  (libraries      (str))))
+
+(library ; モジュールをすべて詰めたライブラリ: jbuilder utopで使う
+ ((name           MinCaml)
+  (flags          (-ccopt -O3 -cclib -O3))
+  (ocamlc_flags   (float.o))
+  (modules        (:standard \ main anchor)) ; 読み込むと入力を受け付け始めるモジュールは除外
+  (libraries      (str))))
