@@ -1,16 +1,20 @@
 {
 (* lexerが利用する変数、関数、型などの定義 *)
 open Parser
+open Lexing
 open Type
 }
 
 (* 正規表現の略記 *)
-let space = [' ' '\t' '\n' '\r']
+let space = [' ' '\t' '\r'] (* \n を除く *)
 let digit = ['0'-'9']
 let lower = ['a'-'z']
 let upper = ['A'-'Z']
 
 rule token = parse
+(* 行番号を取得できるようにLexing.new_lineを呼ぶ *)
+| '\n'
+    { Lexing.new_line lexbuf; token lexbuf }
 | space+
     { token lexbuf }
 | "(*"
@@ -83,12 +87,13 @@ rule token = parse
 | lower (digit|lower|upper|'_')* (* 他の「予約語」より後でないといけない *)
     { IDENT(Lexing.lexeme lexbuf) }
 | _
-    { failwith
-        (Printf.sprintf "unknown token %s near characters %d-%d"
-           (Lexing.lexeme lexbuf)
-           (Lexing.lexeme_start lexbuf)
-           (Lexing.lexeme_end lexbuf)) }
+    (* エラーを出力する関数を呼ぶ *)
+    { Error.explain_lex_error lexbuf (lexeme_start_p lexbuf) (lexeme_end_p lexbuf) }
+
 and comment = parse
+(* 行番号を取得できるようにLexing.new_lineを呼ぶ *)
+| '\n'
+    { Lexing.new_line lexbuf; comment lexbuf }
 | "*)"
     { () }
 | "(*"

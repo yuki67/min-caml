@@ -137,10 +137,8 @@ exp: /* (* 一般の式 (caml2html: parser_exp) *) */
     %prec prec_app
     { Array($2, $3) }
 | error
-    { failwith
-        (Printf.sprintf "parse error near characters %d-%d"
-           (Parsing.symbol_start ())
-           (Parsing.symbol_end ())) }
+    { (* エラーの出力 *)
+      raise (Error.ParseError (symbol_start_pos (), symbol_end_pos ())) }
 
 fundef:
 | IDENT formal_args EQUAL exp
