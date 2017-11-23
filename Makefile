@@ -4,15 +4,17 @@
 # min-camlとocamlでコンパイル・実行した結果を自動で比較します。
 
 RESULT = min-caml
+SRC   = $(shell ls *.ml *.mli)
+TESTS = $(shell ls test/*.ml | grep -v toomanyargs)
 JBUILD_BUILD_PATH=./_build/default
 
 default: $(RESULT)
 
 # jbuilderを使ったビルド
-$(RESULT): $(JBUILD_BUILD_PATH)/main.exe
+$(RESULT): $(JBUILD_BUILD_PATH)/main.exe $(SRC)
 	cp $(JBUILD_BUILD_PATH)/main.exe $(RESULT)
 
-$(JBUILD_BUILD_PATH)/main.exe: $(JBUILD_BUILD_PATH)/float.o
+$(JBUILD_BUILD_PATH)/main.exe: $(JBUILD_BUILD_PATH)/float.o $(SRC)
 	jbuilder build main.exe
 
 $(JBUILD_BUILD_PATH)/float.o: float.c
@@ -22,18 +24,10 @@ $(JBUILD_BUILD_PATH)/float.o: float.c
 utop: $(JBUILD_BUILD_PATH)/float.o
 	jbuilder utop
 
-# ↓テストプログラムが増えたら、これも増やす
-TESTS = print sum-tail gcd sum fib ack even-odd \
-adder funcomp cls-rec cls-bug cls-bug2 cls-reg-bug \
-shuffle spill spill2 spill3 join-stack join-stack2 join-stack3 \
-join-reg join-reg2 non-tail-if non-tail-if2 \
-inprod inprod-rec inprod-loop matmul matmul-flat \
-manyargs
-
-do_test: $(TESTS:%=test/%.cmp)
+do_test: $(TESTS:%.ml=%.cmp)
 
 .PRECIOUS: test/%.s test/% test/%.res test/%.ans test/%.cmp
-TRASH = $(TESTS:%=test/%.s) $(TESTS:%=test/%) $(TESTS:%=test/%.res) $(TESTS:%=test/%.ans) $(TESTS:%=test/%.cmp)
+TRASH = $(TESTS:%.ml=%.s) $(TESTS:%.ml=%) $(TESTS:%.ml=%.res) $(TESTS:%.ml=%.ans) $(TESTS:%.ml=%.cmp)
 
 test/%.s: $(RESULT) test/%.ml
 	./$(RESULT) test/$*
