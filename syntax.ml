@@ -26,6 +26,20 @@ type t = (* MinCamlの構文を表現するデータ型 (caml2html: syntax_t) *)
   | Array of t * t
   | Get of t * t
   | Put of t * t * t
+
+  (* 自班のアーキテクチャ向けに追加したもの *)
+  | Mul of t * t
+  | Div of t * t
+  | Fabs of t list
+  | Fsqrt of t list
+  | Floor of t list
+  | FtoI of t list
+  | ItoF of t list
+  | ReadInt of t list
+  | ReadFloat of t list
+  | PrintChar of t list
+  | PrintInt of t list
+
 and fundef = { name : Id.t * Type.t; args : (Id.t * Type.t) list; body : t }
 
 let rec format_string = function
@@ -45,34 +59,47 @@ let rec format_string = function
   | Eq (s1, s2) -> binary "Eq" (format_string s1) (format_string s2)
   | LE (s1, s2) -> binary "LE" (format_string s1) (format_string s2)
   | If (s1, s2, s3) ->
-    ternary "If" (format_string s1) (format_string s2) (format_string s3)
+      ternary "If" (format_string s1) (format_string s2) (format_string s3)
   | Let ((id, _), s1, s2) ->
-    Printf.sprintf "@[<v 0>Let (@[<0>%s,@ %s,@]@ %s)@]"
-      (quoted id)
-      (format_string s1)
-      (format_string s2)
+      Printf.sprintf "@[<v 0>Let (@[<0>%s,@ %s,@]@ %s)@]"
+        (quoted id)
+        (format_string s1)
+        (format_string s2)
   | Var id -> unary "Var" id;
   | LetRec (def, s) ->
-    Printf.sprintf "@[<v 0>Let (@[<0>%s,@ %s,@ %s,@]@ %s)@]"
-      (quoted (fst def.name))
-      (format_string_of_list (List.map fst def.args) quoted)
-      (format_string def.body)
-      (format_string s)
+      Printf.sprintf "@[<v 0>Let (@[<0>%s,@ %s,@ %s,@]@ %s)@]"
+        (quoted (fst def.name))
+        (format_string_of_list (List.map fst def.args) quoted)
+        (format_string def.body)
+        (format_string s)
   | App (s, slist) ->
-    binary "App"
-      (format_string s)
-      (format_string_of_list slist format_string)
+      binary "App"
+        (format_string s)
+        (format_string_of_list slist format_string)
   | Tuple slist ->
-    unary "Tuple" (format_string_of_list slist format_string)
+      unary "Tuple" (format_string_of_list slist format_string)
   | LetTuple (alist, s1, s2) ->
-    Printf.sprintf "@[<v 0>Let (@[<0>%s,@ %s,@]@ %s)@]"
-      (format_string_of_list (List.map fst alist) quoted)
-      (format_string s1)
-      (format_string s2)
+      Printf.sprintf "@[<v 0>Let (@[<0>%s,@ %s,@]@ %s)@]"
+        (format_string_of_list (List.map fst alist) quoted)
+        (format_string s1)
+        (format_string s2)
   | Array (s1, s2) -> binary "Array" (format_string s1) (format_string s2)
   | Get (s1, s2) -> binary "Get" (format_string s1) (format_string s2)
   | Put (s1, s2, s3) ->
-    ternary "Put" (format_string s1) (format_string s2) (format_string s3)
+      ternary "Put" (format_string s1) (format_string s2) (format_string s3)
+
+
+  | Mul (s1, s2) ->  binary "Mul" (format_string s1) (format_string s2)
+  | Div (s1, s2) ->  binary "Div" (format_string s1) (format_string s2)
+  | Fabs s -> unary "Fabs" (format_string_of_list s format_string)
+  | Fsqrt s -> unary "Fsqrt" (format_string_of_list s format_string)
+  | FtoI s -> unary "FtoI" (format_string_of_list s format_string)
+  | ItoF s -> unary "ItoF" (format_string_of_list s format_string)
+  | ReadInt s -> unary "ReadInt" (format_string_of_list s format_string)
+  | ReadFloat s -> unary "ReadFloat" (format_string_of_list s format_string)
+  | PrintChar s -> unary "PrintChar" (format_string_of_list s format_string)
+  | PrintInt s -> unary "PrintInt" (format_string_of_list s format_string)
+  | Floor s -> unary "Floor" (format_string_of_list s format_string)
 
 let string s =
   s

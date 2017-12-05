@@ -9,9 +9,20 @@ let addtyp x = (x, Type.gentyp ())
 %token <bool> BOOL
 %token <int> INT
 %token <float> FLOAT
+%token FABS
+%token FSQRT
+%token FTOI
+%token ITOF
+%token READ_INT
+%token READ_FLOAT
+%token PRINT_CHAR
+%token PRINT_INT
+%token FLOOR
 %token NOT
 %token MINUS
 %token PLUS
+%token MUL
+%token DIV
 %token MINUS_DOT
 %token PLUS_DOT
 %token AST_DOT
@@ -48,7 +59,7 @@ let addtyp x = (x, Type.gentyp ())
 %nonassoc prec_tuple
 %left COMMA
 %left EQUAL LESS_GREATER LESS GREATER LESS_EQUAL GREATER_EQUAL
-%left PLUS MINUS PLUS_DOT MINUS_DOT
+%left PLUS MINUS PLUS_DOT MINUS_DOT MUL DIV
 %left AST_DOT SLASH_DOT
 %right prec_unary_minus
 %left prec_app
@@ -72,6 +83,17 @@ simple_exp: /* (* 括弧をつけなくても関数の引数になれる式 (cam
 exp: /* (* 一般の式 (caml2html: parser_exp) *) */
 | simple_exp { $1 }
 
+/* 特別関数(直接cpuの1命令になる) */
+| FABS actual_args                   %prec prec_app   { Fabs ($2)     }
+| FSQRT actual_args                  %prec prec_app   { Fsqrt($2)     }
+| FTOI actual_args                   %prec prec_app   { FtoI($2)      }
+| ITOF actual_args                   %prec prec_app   { ItoF($2)      }
+| READ_INT actual_args               %prec prec_app   { ReadInt($2)   }
+| READ_FLOAT actual_args             %prec prec_app   { ReadFloat($2) }
+| PRINT_CHAR actual_args             %prec prec_app   { PrintChar($2) }
+| PRINT_INT actual_args              %prec prec_app   { PrintInt($2)  }
+| FLOOR actual_args                  %prec prec_app   { Floor($2)     }
+
 /* 一項演算子 */
 | NOT       exp %prec prec_app         { Not($2)  }
 | MINUS_DOT exp %prec prec_unary_minus { FNeg($2) }
@@ -83,6 +105,10 @@ exp: /* (* 一般の式 (caml2html: parser_exp) *) */
 /* 二項演算子 */
 | exp PLUS          exp { Add ($1, $3)    } /* (* 足し算を構文解析するルール (caml2html: parser_add) *) */
 | exp MINUS         exp { Sub ($1, $3)    }
+
+| exp MUL           exp { Mul ($1, $3)    }
+| exp DIV           exp { Div ($1, $3)    }
+
 | exp PLUS_DOT      exp { FAdd($1, $3)    }
 | exp MINUS_DOT     exp { FSub($1, $3)    }
 | exp AST_DOT       exp { FMul($1, $3)    }

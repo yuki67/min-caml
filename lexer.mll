@@ -26,9 +26,28 @@ rule token = parse
 | "not"   { NOT                                           }
 | digit+  { INT(int_of_string (Lexing.lexeme lexbuf))     } (* 整数を字句解析するルール (caml2html: lexer_int) *)
 | num_s   { FLOAT(float_of_string (Lexing.lexeme lexbuf)) }
+
+(* 特別関数(直接cpuの1命令になる) *)
+| "fabs"         { FABS       }
+| "abs_float"    { FABS       } (* どちらの表記でもOK *)
+| "fsqrt"        { FSQRT      }
+| "sqrt"         { FSQRT      } (* どちらの表記でもOK *)
+| "float_of_int" { ITOF       }
+| "int_of_float" { FTOI       }
+| "read_int"     { READ_INT   }
+| "read_float"   { READ_FLOAT }
+| "print_char"   { PRINT_CHAR }
+| "print_byte"   { PRINT_CHAR } (* どちらの表記でもOK *)
+| "print_int"    { PRINT_INT  }
+| "floor"        { FLOOR      }
+
 | '-'     { MINUS                                         } (* -.より後回しにしなくても良い? 最長一致? *)
 | '+'     { PLUS                                          } (* +.より後回しにしなくても良い? 最長一致? *)
 | "-."    { MINUS_DOT                                     }
+
+| '*'     { MUL }
+| '/'     { DIV }
+
 | "+."    { PLUS_DOT                                      }
 | "*."    { AST_DOT                                       }
 | "/."    { SLASH_DOT                                     }

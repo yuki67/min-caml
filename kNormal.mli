@@ -22,6 +22,20 @@ type t =
   | Put of Id.t * Id.t * Id.t
   | ExtArray of Id.t
   | ExtFunApp of Id.t * Id.t list
+
+  (* 自班のアーキテクチャ向けに追加したもの *)
+  | Mul of Id.t * Id.t
+  | Div of Id.t * Id.t
+  | Fabs of Id.t
+  | Fsqrt of Id.t
+  | Floor of Id.t
+  | FtoI of Id.t
+  | ItoF of Id.t
+  | ReadInt of Id.t
+  | ReadFloat of Id.t
+  | PrintChar of Id.t
+  | PrintInt of Id.t
+
 and fundef = { name : Id.t * Type.t; args : (Id.t * Type.t) list; body : t }
 
 val fv : t -> S.t

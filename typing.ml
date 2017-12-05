@@ -187,6 +187,41 @@ let rec g env e = (* 型推論ルーチン (caml2html: typing_g) *)
       unify (Type.Array(t)) (g env e1);
       unify Type.Int (g env e2);
       Type.Unit
+
+    (* 自班のアーキテクチャ用に追加したもの *)
+    | Mul  (e1, e2)
+    | Div  (e1, e2) -> unify Type.Int   (g env e1); unify Type.Int   (g env e2); Type.Int
+    (* 特殊関数では引数の数のチェックも行う *)
+    | Fabs e'
+    | Fsqrt e'
+    | Floor e' ->
+      if List.length e' <> 1
+      then failwith @@ "Too many arguments : " ^ (string e)
+      else unify Type.Float (g env (List.hd e')); Type.Float
+    | FtoI e' ->
+      if List.length e' <> 1
+      then failwith @@ "Too many arguments : " ^ (string e)
+      else unify Type.Float (g env (List.hd e')); Type.Int
+    | ItoF e' ->
+      if List.length e' <> 1
+      then failwith @@ "Too many arguments : " ^ (string e)
+      else unify Type.Int (g env (List.hd e')); Type.Float
+    | ReadInt e' ->
+      if List.length e' <> 1
+      then failwith @@ "Too many arguments : " ^ (string e)
+      else unify Type.Unit (g env (List.hd e')); Type.Int
+    | ReadFloat e' ->
+      if List.length e' <> 1
+      then failwith @@ "Too many arguments : " ^ (string e)
+      else unify Type.Unit (g env (List.hd e')); Type.Float
+    | PrintChar e' ->
+      if List.length e' <> 1
+      then failwith @@ "Too many arguments : " ^ (string e)
+      else unify Type.Int (g env (List.hd e')); Type.Unit
+    | PrintInt e' ->       if List.length e' <> 1
+      then failwith @@ "Too many arguments : " ^ (string e)
+      else unify Type.Int (g env (List.hd e')); Type.Unit
+
   (* その他: エラー *)
   with Unify(t1, t2) ->
     (* エラーを出力 *)

@@ -35,4 +35,17 @@ let rec g env = function (* β簡約ルーチン本体 (caml2html: beta_g) *)
   | ExtArray(x) -> ExtArray(x)
   | ExtFunApp(x, ys) -> ExtFunApp(x, List.map (fun y -> find y env) ys)
 
+  (* 特殊関数 *)
+  | Mul(x, y) -> Mul (find x env, find y env)
+  | Div(x, y) -> Div (find x env, find y env)
+  | Fabs(x) -> Fabs(find x env)
+  | Fsqrt(x) -> Fsqrt(find x env)
+  | Floor(x) -> Floor(find x env)
+  | FtoI(x) -> FtoI(find x env)
+  | ItoF(x) -> ItoF(find x env)
+  | ReadInt(x) -> ReadInt(find x env)
+  | ReadFloat(x) -> ReadFloat(find x env)
+  | PrintChar(x) -> PrintChar(find x env)
+  | PrintInt(x) -> PrintInt(find x env)
+
 let f = g M.empty

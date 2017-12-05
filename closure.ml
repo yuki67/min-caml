@@ -25,6 +25,19 @@ type t = (* クロージャ変換後の式 (caml2html: closure_t) *)
   | Get of Id.t * Id.t
   | Put of Id.t * Id.t * Id.t
   | ExtArray of Id.l
+  (* 自班のアーキテクチャ向けに追加したもの *)
+  | Mul of Id.t * Id.t
+  | Div of Id.t * Id.t
+  | Fabs of Id.t
+  | Fsqrt of Id.t
+  | Floor of Id.t
+  | FtoI of Id.t
+  | ItoF of Id.t
+  | ReadInt of Id.t
+  | ReadFloat of Id.t
+  | PrintChar of Id.t
+  | PrintInt of Id.t
+
 type fundef = { name : Id.l * Type.t;
                 args : (Id.t * Type.t) list;
                 formal_fv : (Id.t * Type.t) list;
@@ -43,6 +56,19 @@ let rec fv = function
   | AppDir(_, xs) | Tuple(xs) -> S.of_list xs
   | LetTuple(xts, y, e) -> S.add y (S.diff (fv e) (S.of_list (List.map fst xts)))
   | Put(x, y, z) -> S.of_list [x; y; z]
+
+  (* 特殊関数 *)
+  | Mul(x, y)
+  | Div(x, y) -> S.of_list [x; y]
+  | Fabs s
+  | Fsqrt s
+  | FtoI s
+  | ItoF s
+  | ReadInt s
+  | ReadFloat s
+  | PrintChar s
+  | PrintInt s
+  | Floor s -> S.singleton s
 
 let toplevel : fundef list ref = ref []
 
@@ -101,6 +127,19 @@ let rec g env known = function (* クロージャ変換ルーチン本体 (caml2
   | KNormal.Put(x, y, z) -> Put(x, y, z)
   | KNormal.ExtArray(x) -> ExtArray(Id.L(x))
   | KNormal.ExtFunApp(x, ys) -> AppDir(Id.L("min_caml_" ^ x), ys)
+
+  (* 特殊関数 *)
+  | KNormal.Mul(x, y) -> Mul (x, y)
+  | KNormal.Div(x, y) -> Div (x, y)
+  | KNormal.Fabs(x) -> Fabs(x)
+  | KNormal.Fsqrt(x) -> Fsqrt(x)
+  | KNormal.Floor(x) -> Floor(x)
+  | KNormal.FtoI(x) -> FtoI(x)
+  | KNormal.ItoF(x) -> ItoF(x)
+  | KNormal.ReadInt(x) -> ReadInt(x)
+  | KNormal.ReadFloat(x) -> ReadFloat(x)
+  | KNormal.PrintChar(x) -> PrintChar(x)
+  | KNormal.PrintInt(x) -> PrintInt(x)
 
 let f e =
   toplevel := [];
@@ -166,6 +205,19 @@ and format_string_of_knorm = function
       (quoted entry)
       (format_string_of_list afvs quoted)
       (format_string_of_knorm knorm)
+
+  (* 特殊関数 *)
+  | Mul (id1, id2) ->  binary "Mul" id1 id2
+  | Div (id1, id2) ->  binary "Div" id1 id2
+  | Fabs id -> unary "Fabs" id
+  | Fsqrt id -> unary "Fsqrt" id
+  | FtoI id -> unary "FtoI" id
+  | ItoF id -> unary "ItoF" id
+  | ReadInt id -> unary "ReadInt" id
+  | ReadFloat id -> unary "ReadFloat" id
+  | PrintChar id -> unary "PrintChar" id
+  | PrintInt id -> unary "PrintInt" id
+  | Floor id -> unary "Floor" id
 
 let print k =
   k
