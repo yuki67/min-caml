@@ -1,5 +1,7 @@
 (* rename identifiers to make them unique (alpha-conversion) *)
 
+(* このファイルのコメントはKoki3110によってつけられた *)
+
 (*各型の定義はkNormal.mlにある*)
 open KNormal
 
