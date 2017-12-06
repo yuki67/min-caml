@@ -1,7 +1,21 @@
 open FormatUtil
 
-type closure = { entry : Id.l; actual_fv : Id.t list }
-type t = (* クロージャ変換後の式 (caml2html: closure_t) *)
+(* 関数定義: 引数だけでなく自由変数も保持する *)
+type fundef = {
+  name : Id.l * Type.t;             (* 関数の名前 *)
+  args : (Id.t * Type.t) list;      (* 関数の引数 *)
+  formal_fv : (Id.t * Type.t) list; (* 関数の自由変数 *)
+  body : t                          (* 関数の本体 *)
+}
+
+(* クロージャは関数のラベルに情報を足したものである
+ * 具体的には、ラベルが指す関数が持つ自由変数と変数の対応関係を保持する *)
+and closure = {
+  entry : Id.l;         (* 関数定義を指す変数 *)
+  actual_fv : Id.t list (* entryが指す関数を呼び出すときに、自由変数に代入されるべき値 *)
+}
+
+and t =
   | Unit
   | Int of int
   | Float of float
@@ -17,20 +31,28 @@ type t = (* クロージャ変換後の式 (caml2html: closure_t) *)
   | IfLE of Id.t * Id.t * t * t
   | Let of (Id.t * Type.t) * t * t
   | Var of Id.t
+  (* let rec f x = e1 in e2
+   * -> MakeCls ((f, [fの型]),
+   *             {entry=Id.L(x), actual_fv=[e1に含まれる自由変数の、現時点での値(を指す変数)]},
+   *             e2') *)
   | MakeCls of (Id.t * Type.t) * closure * t
+  (* クロージャ関数の適用 *)
+  (* クロージャを指している変数が第一引数なので、型はId.t *)
   | AppCls of Id.t * Id.t list
+  (* クロージャを使わない関数の適用 *)
+  (* 第一引数はトップレベルの関数を指すので、型はId.L *)
   | AppDir of Id.l * Id.t list
   | Tuple of Id.t list
   | LetTuple of (Id.t * Type.t) list * Id.t * t
   | Get of Id.t * Id.t
   | Put of Id.t * Id.t * Id.t
   | ExtArray of Id.l
-type fundef = { name : Id.l * Type.t;
-                args : (Id.t * Type.t) list;
-                formal_fv : (Id.t * Type.t) list;
-                body : t }
-type prog = Prog of fundef list * t
 
+(* プログラム全体は関数定義とトップレベルの式からなる *)
+and prog = Prog of fundef list * t
+
+(* 式に含まれる自由変数、つまり式だけを見てもどの値を指しているのかわからない変数のリストを返す
+ * fv "let x = 1 + y in x + z" -> [y; z] *)
 let rec fv = function
   | Unit | Int(_) | Float(_) | ExtArray(_) -> S.empty
   | Neg(x) | FNeg(x) -> S.singleton x
@@ -38,15 +60,23 @@ let rec fv = function
   | IfEq(x, y, e1, e2)| IfLE(x, y, e1, e2) -> S.add x (S.add y (S.union (fv e1) (fv e2)))
   | Let((x, t), e1, e2) -> S.union (fv e1) (S.remove x (fv e2))
   | Var(x) -> S.singleton x
-  | MakeCls((x, t), { entry = l; actual_fv = ys }, e) -> S.remove x (S.union (S.of_list ys) (fv e))
+  | MakeCls((x, t), { entry = l; actual_fv = ys }, e) ->
+    (* 定義されるのが再帰関数の場合lが指す関数の本体にxが含まれるので、"S.remove x"が必要 *)
+    S.remove x (S.union (S.of_list ys) (fv e))
   | AppCls(x, ys) -> S.of_list (x :: ys)
   | AppDir(_, xs) | Tuple(xs) -> S.of_list xs
   | LetTuple(xts, y, e) -> S.add y (S.diff (fv e) (S.of_list (List.map fst xts)))
   | Put(x, y, z) -> S.of_list [x; y; z]
 
+(* プログラム全体で定義される関数のリスト *)
+(* 自由変数の有無にかかわらず全てここに入れられる *)
 let toplevel : fundef list ref = ref []
 
+(* KNormal.t型の式をClosure.t型に変換する
+   env   : これまでに定義された変数からその型への写像
+   known : f ∈ known <-> 関数fの本体には自由変数がないので、呼び出しにクロージャが使われない *)
 let rec g env known = function (* クロージャ変換ルーチン本体 (caml2html: closure_g) *)
+  (* ベースケース *)
   | KNormal.Unit -> Unit
   | KNormal.Int(i) -> Int(i)
   | KNormal.Float(d) -> Float(d)
@@ -58,11 +88,33 @@ let rec g env known = function (* クロージャ変換ルーチン本体 (caml2
   | KNormal.FSub(x, y) -> FSub(x, y)
   | KNormal.FMul(x, y) -> FMul(x, y)
   | KNormal.FDiv(x, y) -> FDiv(x, y)
+  | KNormal.Var(x) -> Var(x)
+  | KNormal.Tuple(xs) -> Tuple(xs)
+  | KNormal.Get(x, y) -> Get(x, y)
+  | KNormal.Put(x, y, z) -> Put(x, y, z)
+  | KNormal.ExtArray(x) -> ExtArray(Id.L(x))
+  | KNormal.ExtFunApp(x, ys) -> AppDir(Id.L("min_caml_" ^ x), ys)
+  (* - S.mem f known <-> トップレベルに関数fの定義が登録されており、かつクロージャ無しで呼べる *)
+  | KNormal.App(f, ys) when S.mem f known -> (* 関数適用の場合 (caml2html: closure_app) *)
+    Format.eprintf "directly applying %s@." f;
+    AppDir(Id.L(f), ys)
+  (* - Appの第一引数がknownに無い場合、xはクロージャを指す *)
+  | KNormal.App(x, ys) -> AppCls(x, ys)
+
+  (* 再帰ステップ *)
   | KNormal.IfEq(x, y, e1, e2) -> IfEq(x, y, g env known e1, g env known e2)
   | KNormal.IfLE(x, y, e1, e2) -> IfLE(x, y, g env known e1, g env known e2)
   | KNormal.Let((x, t), e1, e2) -> Let((x, t), g env known e1, g (M.add x t env) known e2)
-  | KNormal.Var(x) -> Var(x)
-  | KNormal.LetRec({ KNormal.name = (x, t); KNormal.args = yts; KNormal.body = e1 }, e2) -> (* 関数定義の場合 (caml2html: closure_letrec) *)
+  | KNormal.LetTuple(xts, y, e) -> LetTuple(xts, y, g (M.add_list xts env) known e)
+
+  (* - まずe1の自由変数を求め、関数をtoplevelに登録する
+   * -- 自由変数がない場合はe2だけを残す
+   * -- 自由変数がある場合はクロージャを生成してからe2を実行するコードにする *)
+  | KNormal.LetRec
+      ({ KNormal.name = (x, t);
+         KNormal.args = yts;
+         KNormal.body = e1 },
+       e2) -> (* 関数定義の場合 (caml2html: closure_letrec) *)
     (* 関数定義let rec x y1 ... yn = e1 in e2の場合は、
        xに自由変数がない(closureを介さずdirectに呼び出せる)
        と仮定し、knownに追加してe1をクロージャ変換してみる *)
@@ -75,7 +127,9 @@ let rec g env known = function (* クロージャ変換ルーチン本体 (caml2
        (thanks to nuevo-namasute and azounoman; test/cls-bug2.ml参照) *)
     let zs = S.diff (fv e1') (S.of_list (List.map fst yts)) in
     let known', e1' =
-      if S.is_empty zs then known', e1' else
+      if S.is_empty zs
+      then known', e1' (* e1'に関数の引数以外の自由変数がない -> クロージャはいらない *)
+      else             (* e1'に関数の引数以外の自由変数が出てくる -> クロージャを作る必要がある *)
         (* 駄目だったら状態(toplevelの値)を戻して、クロージャ変換をやり直す *)
         (Format.eprintf "free variable(s) %s found in function %s@." (Id.pp_list (S.elements zs)) x;
          Format.eprintf "function %s cannot be directly applied in fact@." x;
@@ -89,18 +143,9 @@ let rec g env known = function (* クロージャ変換ルーチン本体 (caml2
     if S.mem x (fv e2') then (* xが変数としてe2'に出現するか *)
       MakeCls((x, t), { entry = Id.L(x); actual_fv = zs }, e2') (* 出現していたら削除しない *)
     else
+      (* xがAppDirでだけ使われるとき(xの本体に出現する自由変数がExtArrayのときなど)はセーフ *)
       (Format.eprintf "eliminating closure(s) %s@." x;
        e2') (* 出現しなければMakeClsを削除 *)
-  | KNormal.App(x, ys) when S.mem x known -> (* 関数適用の場合 (caml2html: closure_app) *)
-    Format.eprintf "directly applying %s@." x;
-    AppDir(Id.L(x), ys)
-  | KNormal.App(f, xs) -> AppCls(f, xs)
-  | KNormal.Tuple(xs) -> Tuple(xs)
-  | KNormal.LetTuple(xts, y, e) -> LetTuple(xts, y, g (M.add_list xts env) known e)
-  | KNormal.Get(x, y) -> Get(x, y)
-  | KNormal.Put(x, y, z) -> Put(x, y, z)
-  | KNormal.ExtArray(x) -> ExtArray(Id.L(x))
-  | KNormal.ExtFunApp(x, ys) -> AppDir(Id.L("min_caml_" ^ x), ys)
 
 let f e =
   toplevel := [];
