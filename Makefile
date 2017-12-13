@@ -14,14 +14,11 @@ default: $(RESULT)
 $(RESULT): $(JBUILD_BUILD_PATH)/main.exe $(SRC)
 	cp $(JBUILD_BUILD_PATH)/main.exe $(RESULT)
 
-$(JBUILD_BUILD_PATH)/main.exe: $(JBUILD_BUILD_PATH)/float.o $(SRC)
+$(JBUILD_BUILD_PATH)/main.exe: $(SRC)
 	jbuilder build main.exe
 
-$(JBUILD_BUILD_PATH)/float.o: float.c
-	jbuilder build float.o
-
 # モジュールをすべてロードしたutopを起動する
-utop: $(JBUILD_BUILD_PATH)/float.o
+utop:
 	jbuilder utop
 
 do_test: $(TESTS:%.ml=%.cmp)
