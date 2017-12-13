@@ -32,5 +32,5 @@ type prog = Prog of fundef list * t
 val fv : t -> S.t
 val f : KNormal.t -> prog
 
-val print : prog -> unit
+val print : Format.formatter -> prog -> unit
 val string : prog -> string

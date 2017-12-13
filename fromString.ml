@@ -15,13 +15,3 @@ let virtual_ str = closure  str |> Virtual.f
 let simm str     = virtual_ str |> Simm.f
 let regalloc str = simm     str |> RegAlloc.f
 let emit str     = regalloc str |> Emit.f stdout
-
-(* コンパイルして出力する *)
-let syntax_p str   = syntax   str |> Syntax.print
-let type_p str     = type_    str |> Syntax.print
-let knormal_p str  = knormal  str |> KNormal.print
-let alpha_p str    = alpha    str |> KNormal.print
-let closure_p str  = closure  str |> Closure.print
-let virtual_p str  = virtual_ str |> Asm.print
-let simm_p str     = simm     str |> Asm.print
-let regalloc_p str = regalloc str |> Asm.print

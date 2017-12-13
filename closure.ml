@@ -212,11 +212,11 @@ and format_string_of_knorm = function
       (format_string_of_list afvs quoted)
       (format_string_of_knorm knorm)
 
-let print k =
+let print fmt k =
   k
   |> format_string
   |> (fun str -> Scanf.format_from_string str "")
-  |> Format.printf
+  |> Format.fprintf fmt
 
 let string k =
   k

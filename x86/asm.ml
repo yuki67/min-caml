@@ -198,12 +198,12 @@ let format_string (Prog (ftable, fundefs, asm)) =
     (format_string_of_list fundefs format_string_of_fundef)
     (format_string_of_asm asm)
 
-let print k =
+let print fmt k =
   k
   |> format_string
   |> Str.global_replace (Str.regexp_string "%") "%%"
   |> (fun str -> Scanf.format_from_string str "")
-  |> Format.printf
+  |> Format.fprintf fmt
 
 let string k =
   k

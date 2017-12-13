@@ -232,11 +232,11 @@ let rec format_string = function
   | ExtFunApp (id, idlist) ->
     binary "ExtFunApp" (unary "Var" id) (format_string_of_list idlist (unary "Var"))
 
-let print k =
+let print fmt k =
   k
   |> format_string
   |> (fun str -> Scanf.format_from_string str "")
-  |> Format.printf
+  |> Format.fprintf fmt
 
 let string k =
   k
