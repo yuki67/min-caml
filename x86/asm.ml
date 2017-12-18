@@ -2,26 +2,36 @@ open FormatUtil
 
 (* 2オペランドではなく3オペランドのx86アセンブリもどき *)
 
-type id_or_imm = V of Id.t | C of int
+type id_or_imm =
+  | V of Id.t (* 変数(variable) *)
+  | C of int  (* 定数/即値 (constant) *)
 type t = (* 命令の列 (caml2html: sparcasm_t) *)
-  | Ans of exp
+  | Ans of exp                       (* "e の返り値を返り値レジスタに入れてreturn"を表す *)
+  (* "e1の返り値をレジスタxに入れ、続けてe2を実行"を表す *)
+  (* xがレジスタを表さないときもある("Id.gentmp typ" など) *)
   | Let of (Id.t * Type.t) * exp * t
 and exp = (* 一つ一つの命令に対応する式 (caml2html: sparcasm_exp) *)
+  (* 命令の実行結果をどのレジスタに格納するかという情報をこの型は保持しないことに注意 *)
+  (* (保持する必要があるなら)Asm.t型のLetが保持する *)
   | Nop
-  | Set of int
-  | SetL of Id.l
-  | Mov of Id.t
-  | Neg of Id.t
+  | Set of int   (* 即値(int)の設定 *)
+  | SetL of Id.l (* 即値(ラベル)の設定 *)
+  | Mov of Id.t  (* レジスタ間の値のコピー *)
+  | Neg of Id.t  (* マイナス (論理否定でない) *)
   | Add of Id.t * id_or_imm
   | Sub of Id.t * id_or_imm
+  (* Ld/St (x, V(y), d) : メモリのx+d*y番地{から読み込み / へ保存} *)
+  (* Ld/St (x, C(y), d) : メモリのx+y+d番地{から読み込み / へ保存} *)
   | Ld of Id.t * id_or_imm * int
   | St of Id.t * Id.t * id_or_imm * int
-  | FMovD of Id.t
-  | FNegD of Id.t
+  | FMovD of Id.t (* float値のレジスタ間コピー(Dは"Double") *)
+  | FNegD of Id.t (* マイナス (論理否定でない) *)
   | FAddD of Id.t * Id.t
   | FSubD of Id.t * Id.t
   | FMulD of Id.t * Id.t
   | FDivD of Id.t * Id.t
+  (* LdDF/StDF (x, V(y), d) : 浮動小数点をメモリのx+d*y番地{から読み込み / へ保存} *)
+  (* LdDF/StDF (x, C(y), d) : 浮動小数点をメモリのx+y+d番地{から読み込み / へ保存} *)
   | LdDF of Id.t * id_or_imm * int
   | StDF of Id.t * Id.t * id_or_imm * int
   | Comment of string
@@ -40,7 +50,11 @@ type fundef = { name : Id.l; args : Id.t list; fargs : Id.t list; body : t; ret 
 (* プログラム全体 = 浮動小数点数テーブル + トップレベル関数 + メインの式 (caml2html: sparcasm_prog) *)
 type prog = Prog of (Id.l * float) list * fundef list * t
 
+(* floatに対するLet式を返す *)
+(* floatを特別扱いする場合はここを編集する *)
 let fletd(x, e1, e2) = Let((x, Type.Float), e1, e2)
+
+(* "e1; e2"に対応する命令を返す *)
 let seq(e1, e2) = Let((Id.gentmp Type.Unit, Type.Unit), e1, e2)
 
 let regs = (* Array.init 16 (fun i -> Printf.sprintf "%%r%d" i) *)
@@ -82,6 +96,7 @@ and fv = function
     fv_exp exp @ remove_and_uniq (S.singleton x) (fv e)
 let fv e = remove_and_uniq S.empty (fv e)
 
+(* "let x1 = e1 in e2" に相当するAsm.tの値を返す *)
 let rec concat e1 xt e2 =
   match e1 with
   | Ans(exp) -> Let(xt, exp, e2)

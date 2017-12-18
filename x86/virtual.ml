@@ -1,4 +1,5 @@
 (* translation into assembly with infinite number of virtual registers *)
+(* asm.mlのコメントも参照 *)
 
 (*M.xxxはほぼMap.Make.xxx。詳細はm.ml*)
 (*環境envは変数名(またはラベル名)から型への写像*)
